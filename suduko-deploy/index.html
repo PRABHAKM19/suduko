@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mini Logic — 6x6 Sudoku</title>
+<style id="msl-styles">
+:root {
+  --msl-bg: #12172b;
+  --msl-panel: #1b2140;
+  --msl-line: #323a63;
+  --msl-line-strong: #4a5488;
+  --msl-paper: #edeae0;
+  --msl-paper-dim: #a9afc7;
+  --msl-brass: #cda349;
+  --msl-brass-dim: #8a7133;
+  --msl-error: #d97a70;
+  --msl-error-bg: rgba(217, 122, 112, 0.16);
+  --msl-success: #8fc27c;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--msl-bg);
+  min-height: 100%;
+}
+
+.msl-app, .msl-app * {
+  box-sizing: border-box;
+}
+
+.msl-app {
+  --msl-font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --msl-font-mono: 'JetBrains Mono', 'SFMono-Regular', 'Cascadia Code', Consolas, monospace;
+  --msl-font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+  background: var(--msl-bg);
+  color: var(--msl-paper);
+  font-family: var(--msl-font-ui);
+  border-radius: 18px;
+}
+
+.msl-header {
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  border-bottom: 1px solid var(--msl-line);
+  padding-bottom: 1.25rem;
+}
+
+.msl-title {
+  font-family: var(--msl-font-display);
+  font-size: 2.1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  margin: 0 0 0.35rem;
+  color: var(--msl-paper);
+}
+
+.msl-subtitle {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--msl-paper-dim);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.msl-status {
+  display: flex;
+  gap: 1.1rem;
+  font-family: var(--msl-font-mono);
+  font-size: 0.85rem;
+  color: var(--msl-paper-dim);
+}
+
+.msl-status strong {
+  display: block;
+  color: var(--msl-paper);
+  font-size: 1.05rem;
+}
+
+.msl-status span {
+  display: block;
+  text-align: center;
+}
+
+.msl-main {
+  display: grid;
+  grid-template-columns: minmax(0, 420px) minmax(220px, 1fr);
+  gap: 2rem;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .msl-main {
+    grid-template-columns: 1fr;
+  }
+}
+
+.msl-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  aspect-ratio: 1 / 1;
+  background: var(--msl-line-strong);
+  border: 2px solid var(--msl-line-strong);
+  border-radius: 10px;
+  overflow: hidden;
+  gap: 1px;
+  transition: opacity 0.2s ease;
+}
+
+.msl-grid--solved {
+  pointer-events: none;
+}
+
+.msl-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--msl-panel);
+  border: none;
+  color: var(--msl-brass);
+  font-family: var(--msl-font-mono);
+  font-size: clamp(1.1rem, 4vw, 1.6rem);
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+}
+
+.msl-cell--box-right {
+  border-right: 2px solid var(--msl-line-strong);
+}
+
+.msl-cell--box-bottom {
+  border-bottom: 2px solid var(--msl-line-strong);
+}
+
+.msl-cell--given {
+  color: var(--msl-paper);
+  font-weight: 600;
+  cursor: default;
+}
+
+.msl-cell--peer {
+  background: #232a4d;
+}
+
+.msl-cell--selected {
+  background: var(--msl-brass-dim);
+  color: var(--msl-paper);
+}
+
+.msl-cell--same-value {
+  box-shadow: inset 0 0 0 2px var(--msl-brass);
+}
+
+.msl-cell--conflict {
+  background: var(--msl-error-bg);
+  color: var(--msl-error);
+}
+
+.msl-cell:focus-visible {
+  outline: 2px solid var(--msl-brass);
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.msl-cell-notes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  width: 88%;
+  height: 88%;
+  font-family: var(--msl-font-mono);
+  font-size: clamp(0.55rem, 1.6vw, 0.7rem);
+  color: var(--msl-paper-dim);
+}
+
+.msl-cell-notes span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.msl-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.msl-field-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--msl-paper-dim);
+  margin: 0 0 0.5rem;
+}
+
+.msl-difficulty,
+.msl-actions,
+.msl-keypad {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.msl-btn {
+  font-family: var(--msl-font-ui);
+  font-size: 0.85rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--msl-line);
+  background: var(--msl-panel);
+  color: var(--msl-paper);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.msl-btn:hover:not(:disabled) {
+  border-color: var(--msl-brass);
+}
+
+.msl-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.msl-btn[aria-pressed='true'] {
+  background: var(--msl-brass-dim);
+  border-color: var(--msl-brass);
+  color: var(--msl-paper);
+}
+
+.msl-btn:focus-visible {
+  outline: 2px solid var(--msl-brass);
+  outline-offset: 2px;
+}
+
+.msl-key {
+  width: 2.6rem;
+  height: 2.6rem;
+  font-family: var(--msl-font-mono);
+  font-size: 1.1rem;
+  padding: 0;
+}
+
+.msl-key--erase {
+  width: auto;
+  padding: 0 0.85rem;
+  font-family: var(--msl-font-ui);
+}
+
+.msl-help {
+  font-size: 0.82rem;
+  color: var(--msl-paper-dim);
+  line-height: 1.5;
+  border-top: 1px solid var(--msl-line);
+  padding-top: 1rem;
+}
+
+.msl-win {
+  border: 1px solid var(--msl-success);
+  background: rgba(143, 194, 124, 0.12);
+  color: var(--msl-success);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  font-size: 0.9rem;
+}
+
+.msl-win[hidden] {
+  display: none;
+}
+
+.msl-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msl-app * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+</style>
+</head>
+<body>
+<div id="mini-logic-root"></div>
+
+<script>
+'use strict';
+
+// ============================================================================
+// 1. Core constants
+// ============================================================================
+
+const GRID_SIZE = 6;
+const BOX_HEIGHT = 2; // rows per box
+const BOX_WIDTH = 3; // columns per box
+const DIGITS = Object.freeze([1, 2, 3, 4, 5, 6]);
+const DIFFICULTIES = Object.freeze(['easy', 'medium', 'hard']);
+const CLUE_TARGETS = Object.freeze({
+  easy: 22,
+  medium: 16,
+  hard: 11,
+});
+
+// ============================================================================
+// 2. Small utilities (random, cloning, formatting, assertions)
+// ============================================================================
+
+function secureRandomInt(maxExclusive) {
+  if (!Number.isInteger(maxExclusive) || maxExclusive <= 0) {
+    throw new RangeError('maxExclusive must be a positive integer');
+  }
+  const RANGE = 0x1_0000_0000; // 2^32
+  const rejectionLimit = RANGE - (RANGE % maxExclusive);
+  const buffer = new Uint32Array(1);
+  let value;
+  do {
+    crypto.getRandomValues(buffer);
+    value = buffer[0];
+  } while (value >= rejectionLimit);
+  return value % maxExclusive;
+}
+
+function shuffle(items) {
+  const result = items.slice();
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = secureRandomInt(i + 1);
+    const tmp = result[i];
+    result[i] = result[j];
+    result[j] = tmp;
+  }
+  return result;
+}
+
+function cloneGrid(grid) {
+  return grid.map((row) => row.slice());
+}
+
+function formatTime(totalSeconds) {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function isInRange(value, min, max) {
+  return Number.isInteger(value) && value >= min && value <= max;
+}
+
+function assertValidCoordinate(row, col) {
+  if (!isInRange(row, 0, GRID_SIZE - 1) || !isInRange(col, 0, GRID_SIZE - 1)) {
+    throw new RangeError(`Coordinate out of bounds: (${row}, ${col})`);
+  }
+}
+
+function assertValidDigit(digit) {
+  if (!isInRange(digit, 1, GRID_SIZE)) {
+    throw new RangeError(`Digit out of range: ${digit}`);
+  }
+}
+
+class SolverBudgetExceededError extends Error {
+  constructor() {
+    super('Solver exceeded its node-visit budget');
+    this.name = 'SolverBudgetExceededError';
+  }
+}
+
+// ============================================================================
+// 3. SudokuEngine — pure puzzle logic (no state, no DOM)
+// ============================================================================
+
+class SudokuEngine {
+  constructor() {
+    throw new Error('SudokuEngine is a static-only class and cannot be instantiated.');
+  }
+
+  static allPositions() {
+    const positions = [];
+    for (let row = 0; row < GRID_SIZE; row++) {
+      for (let col = 0; col < GRID_SIZE; col++) {
+        positions.push({ row, col });
+      }
+    }
+    return positions;
+  }
+
+  static *peersOf(row, col) {
+    for (let c = 0; c < GRID_SIZE; c++) {
+      if (c !== col) yield { row, col: c };
+    }
+    for (let r = 0; r < GRID_SIZE; r++) {
+      if (r !== row) yield { row: r, col };
+    }
+    const boxRowStart = Math.floor(row / BOX_HEIGHT) * BOX_HEIGHT;
+    const boxColStart = Math.floor(col / BOX_WIDTH) * BOX_WIDTH;
+    for (let r = boxRowStart; r < boxRowStart + BOX_HEIGHT; r++) {
+      for (let c = boxColStart; c < boxColStart + BOX_WIDTH; c++) {
+        if (r !== row && c !== col) yield { row: r, col: c };
+      }
+    }
+  }
+
+  static isValidPlacement(grid, row, col, value) {
+    for (const peer of SudokuEngine.peersOf(row, col)) {
+      if (grid[peer.row][peer.col] === value) return false;
+    }
+    return true;
+  }
+
+  static computeConflicts(grid) {
+    const conflicts = Array.from({ length: GRID_SIZE }, () => new Array(GRID_SIZE).fill(false));
+    for (let row = 0; row < GRID_SIZE; row++) {
+      for (let col = 0; col < GRID_SIZE; col++) {
+        const value = grid[row][col];
+        if (value === 0) continue;
+        for (const peer of SudokuEngine.peersOf(row, col)) {
+          if (grid[peer.row][peer.col] === value) {
+            conflicts[row][col] = true;
+            break;
+          }
+        }
+      }
+    }
+    return conflicts;
+  }
+
+  static hasAnyConflict(conflicts) {
+    return conflicts.some((row) => row.some(Boolean));
+  }
+
+  static findEmptyCell(grid) {
+    for (let row = 0; row < GRID_SIZE; row++) {
+      for (let col = 0; col < GRID_SIZE; col++) {
+        if (grid[row][col] === 0) return { row, col };
+      }
+    }
+    return null;
+  }
+
+  static fillRandomly(grid, index) {
+    if (index === GRID_SIZE * GRID_SIZE) return true;
+    const row = Math.floor(index / GRID_SIZE);
+    const col = index % GRID_SIZE;
+    for (const digit of shuffle(DIGITS)) {
+      if (SudokuEngine.isValidPlacement(grid, row, col, digit)) {
+        grid[row][col] = digit;
+        if (SudokuEngine.fillRandomly(grid, index + 1)) return true;
+        grid[row][col] = 0;
+      }
+    }
+    return false;
+  }
+
+  static generateSolution() {
+    const grid = Array.from({ length: GRID_SIZE }, () => new Array(GRID_SIZE).fill(0));
+    if (!SudokuEngine.fillRandomly(grid, 0)) {
+      throw new Error('Unable to generate a valid Mini Sudoku solution.');
+    }
+    return grid;
+  }
+
+  static countSolutions(grid, cap) {
+    const MAX_NODES = 200_000;
+    let nodesVisited = 0;
+    let count = 0;
+
+    function backtrack() {
+      nodesVisited++;
+      if (nodesVisited > MAX_NODES) throw new SolverBudgetExceededError();
+      const empty = SudokuEngine.findEmptyCell(grid);
+      if (!empty) {
+        count++;
+        return count >= cap;
+      }
+      for (const digit of DIGITS) {
+        if (SudokuEngine.isValidPlacement(grid, empty.row, empty.col, digit)) {
+          grid[empty.row][empty.col] = digit;
+          const stop = backtrack();
+          grid[empty.row][empty.col] = 0;
+          if (stop) return true;
+        }
+      }
+      return false;
+    }
+
+    try {
+      backtrack();
+    } catch (error) {
+      if (error instanceof SolverBudgetExceededError) return cap;
+      throw error;
+    }
+    return count;
+  }
+
+  static generatePuzzle(difficulty) {
+    const solution = SudokuEngine.generateSolution();
+    const puzzle = cloneGrid(solution);
+    const targetClues = CLUE_TARGETS[difficulty];
+    let remainingClues = GRID_SIZE * GRID_SIZE;
+
+    for (const { row, col } of shuffle(SudokuEngine.allPositions())) {
+      if (remainingClues <= targetClues) break;
+      const backup = puzzle[row][col];
+      puzzle[row][col] = 0;
+      const solutionCount = SudokuEngine.countSolutions(cloneGrid(puzzle), 2);
+      if (solutionCount === 1) {
+        remainingClues--;
+      } else {
+        puzzle[row][col] = backup; // Removing this clue broke uniqueness.
+      }
+    }
+    return { puzzle, solution };
+  }
+}
+
+// ============================================================================
+// 4. Persistence — validated localStorage load/save
+// ============================================================================
+
+const STORAGE_KEY = 'mini-logic-sudoku:v1';
+const STORAGE_VERSION = 1;
+
+function is2DArray(value, size, itemGuard) {
+  if (!Array.isArray(value) || value.length !== size) return false;
+  return value.every((row) => Array.isArray(row) && row.length === size && row.every(itemGuard));
+}
+
+function isCellValue(value) {
+  return typeof value === 'number' && isInRange(value, 0, GRID_SIZE);
+}
+
+function isDigitValue(value) {
+  return typeof value === 'number' && isInRange(value, 1, GRID_SIZE);
+}
+
+function isBooleanValue(value) {
+  return typeof value === 'boolean';
+}
+
+function isNonNegativeFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+function isNotesGrid(value) {
+  if (!Array.isArray(value) || value.length !== GRID_SIZE) return false;
+  return value.every((row) => {
+    if (!Array.isArray(row) || row.length !== GRID_SIZE) return false;
+    return row.every((cellNotes) => Array.isArray(cellNotes) && cellNotes.every(isDigitValue));
+  });
+}
+
+function isPersistedState(value) {
+  if (typeof value !== 'object' || value === null) return false;
+  const record = value;
+
+  if (record.version !== STORAGE_VERSION) return false;
+  if (typeof record.difficulty !== 'string' || !DIFFICULTIES.includes(record.difficulty)) return false;
+  if (!is2DArray(record.puzzle, GRID_SIZE, isCellValue)) return false;
+  if (!is2DArray(record.solution, GRID_SIZE, isDigitValue)) return false;
+  if (!is2DArray(record.playerGrid, GRID_SIZE, isCellValue)) return false;
+  if (!is2DArray(record.givenMask, GRID_SIZE, isBooleanValue)) return false;
+  if (!isNotesGrid(record.notes)) return false;
+  if (!isNonNegativeFiniteNumber(record.mistakes)) return false;
+  if (!isNonNegativeFiniteNumber(record.hintsUsed)) return false;
+  if (!isNonNegativeFiniteNumber(record.elapsedSeconds)) return false;
+  if (typeof record.notesMode !== 'boolean') return false;
+
+  return true;
+}
+
+// ============================================================================
+// 5. GameController — mutable state, rules, timer, persistence
+// ============================================================================
+
+class GameController extends EventTarget {
+  static MAX_HINTS = 3;
+  static MAX_UNDO_STEPS = 50;
+  static TICK_INTERVAL_MS = 1000;
+
+  #difficulty;
+  #puzzle;
+  #solution;
+  #playerGrid;
+  #givenMask;
+  #notes;
+  #selected = null;
+  #notesMode = false;
+  #mistakes = 0;
+  #hintsUsed = 0;
+  #solved = false;
+  #history = [];
+  #elapsedBeforePause;
+  #timerStartedAtMs = null;
+  #timerHandle = null;
+
+  constructor(difficulty, persisted) {
+    super();
+    if (persisted) {
+      this.#difficulty = persisted.difficulty;
+      this.#puzzle = persisted.puzzle;
+      this.#solution = persisted.solution;
+      this.#playerGrid = persisted.playerGrid;
+      this.#givenMask = persisted.givenMask;
+      this.#notes = persisted.notes.map((row) => row.map((digits) => new Set(digits)));
+      this.#mistakes = persisted.mistakes;
+      this.#hintsUsed = persisted.hintsUsed;
+      this.#notesMode = persisted.notesMode;
+      this.#elapsedBeforePause = persisted.elapsedSeconds;
+      const conflicts = SudokuEngine.computeConflicts(this.#playerGrid);
+      this.#solved = this.#isBoardComplete() && !SudokuEngine.hasAnyConflict(conflicts);
+    } else {
+      const { puzzle, solution } = SudokuEngine.generatePuzzle(difficulty);
+      this.#difficulty = difficulty;
+      this.#puzzle = puzzle;
+      this.#solution = solution;
+      this.#playerGrid = cloneGrid(puzzle);
+      this.#givenMask = puzzle.map((row) => row.map((value) => value !== 0));
+      this.#notes = Array.from({ length: GRID_SIZE }, () =>
+        Array.from({ length: GRID_SIZE }, () => new Set()),
+      );
+      this.#elapsedBeforePause = 0;
+    }
+  }
+
+  static createNew(difficulty = 'easy') {
+    return new GameController(difficulty);
+  }
+
+  static restore() {
+    if (typeof localStorage === 'undefined') return null;
+    let raw;
+    try {
+      raw = localStorage.getItem(STORAGE_KEY);
+    } catch {
+      return null;
+    }
+    if (!raw) return null;
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+    if (!isPersistedState(parsed)) return null;
+    return new GameController(parsed.difficulty, parsed);
+  }
+
+  static restoreOrCreate() {
+    return GameController.restore() ?? GameController.createNew('easy');
+  }
+
+  get elapsedSeconds() {
+    if (this.#timerStartedAtMs === null) return this.#elapsedBeforePause;
+    return this.#elapsedBeforePause + Math.floor((Date.now() - this.#timerStartedAtMs) / 1000);
+  }
+
+  get snapshot() {
+    const conflicts = SudokuEngine.computeConflicts(this.#playerGrid);
+    const grid = this.#playerGrid.map((row, r) =>
+      row.map((value, c) => ({
+        row: r,
+        col: c,
+        value,
+        isGiven: this.#givenMask[r][c],
+        hasConflict: conflicts[r][c],
+        notes: Array.from(this.#notes[r][c]).sort((a, b) => a - b),
+      })),
+    );
+    return Object.freeze({
+      grid,
+      difficulty: this.#difficulty,
+      selected: this.#selected,
+      notesMode: this.#notesMode,
+      mistakes: this.#mistakes,
+      hintsUsed: this.#hintsUsed,
+      hintsRemaining: Math.max(0, GameController.MAX_HINTS - this.#hintsUsed),
+      elapsedSeconds: this.elapsedSeconds,
+      isSolved: this.#solved,
+      canUndo: this.#history.length > 0,
+    });
+  }
+
+  startTimer() {
+    if (this.#solved || this.#timerHandle !== null) return;
+    this.#timerStartedAtMs = Date.now();
+    this.#timerHandle = setInterval(() => {
+      this.dispatchEvent(new CustomEvent('tick', { detail: this.elapsedSeconds }));
+    }, GameController.TICK_INTERVAL_MS);
+  }
+
+  pauseTimer() {
+    if (this.#timerStartedAtMs !== null) {
+      this.#elapsedBeforePause = this.elapsedSeconds;
+      this.#timerStartedAtMs = null;
+    }
+    if (this.#timerHandle !== null) {
+      clearInterval(this.#timerHandle);
+      this.#timerHandle = null;
+    }
+    this.#persist();
+  }
+
+  resumeTimer() {
+    if (!this.#solved) this.startTimer();
+  }
+
+  selectCell(row, col) {
+    assertValidCoordinate(row, col);
+    this.#selected = { row, col };
+    this.#emitChange(false);
+  }
+
+  moveSelection(deltaRow, deltaCol) {
+    const base = this.#selected ?? { row: 0, col: 0 };
+    const row = Math.min(GRID_SIZE - 1, Math.max(0, base.row + deltaRow));
+    const col = Math.min(GRID_SIZE - 1, Math.max(0, base.col + deltaCol));
+    this.selectCell(row, col);
+  }
+
+  toggleNotesMode() {
+    this.#notesMode = !this.#notesMode;
+    this.#emitChange();
+  }
+
+  inputDigit(digit) {
+    assertValidDigit(digit);
+    if (!this.#selected || this.#solved) return;
+    const { row, col } = this.#selected;
+    if (this.#givenMask[row][col]) {
+      this.#announce('That cell is already filled and cannot be changed.');
+      return;
+    }
+
+    if (this.#notesMode) {
+      if (this.#playerGrid[row][col] !== 0) {
+        this.#announce('Erase the cell before adding notes.');
+        return;
+      }
+      this.#pushHistory();
+      const cellNotes = this.#notes[row][col];
+      if (cellNotes.has(digit)) cellNotes.delete(digit);
+      else cellNotes.add(digit);
+      this.#emitChange();
+      return;
+    }
+
+    this.#pushHistory();
+    this.#playerGrid[row][col] = digit;
+    this.#notes[row][col].clear();
+    this.#clearDigitFromPeerNotes(row, col, digit);
+
+    const conflicts = SudokuEngine.computeConflicts(this.#playerGrid);
+    if (conflicts[row][col]) {
+      this.#mistakes++;
+      this.#announce(`${digit} conflicts with this row, column, or box.`);
+    }
+    this.#checkForSolve(conflicts);
+    this.#emitChange();
+  }
+
+  eraseSelected() {
+    if (!this.#selected || this.#solved) return;
+    const { row, col } = this.#selected;
+    if (this.#givenMask[row][col]) return;
+    if (this.#playerGrid[row][col] === 0 && this.#notes[row][col].size === 0) return;
+    this.#pushHistory();
+    this.#playerGrid[row][col] = 0;
+    this.#notes[row][col].clear();
+    this.#emitChange();
+  }
+
+  undo() {
+    const previous = this.#history.pop();
+    if (!previous) {
+      this.#announce('Nothing to undo.');
+      this.#emitChange(false);
+      return;
+    }
+    this.#playerGrid = previous.playerGrid;
+    this.#notes = previous.notes;
+    this.#givenMask = previous.givenMask;
+    this.#mistakes = previous.mistakes;
+    const conflicts = SudokuEngine.computeConflicts(this.#playerGrid);
+    this.#solved = this.#isBoardComplete() && !SudokuEngine.hasAnyConflict(conflicts);
+    if (!this.#solved) this.resumeTimer();
+    this.#emitChange();
+  }
+
+  requestHint() {
+    if (this.#solved) return;
+    if (this.#hintsUsed >= GameController.MAX_HINTS) {
+      this.#announce('No hints left for this puzzle.');
+      this.#emitChange(false);
+      return;
+    }
+    const target = this.#pickHintTarget();
+    if (!target) {
+      this.#announce('Nothing left to reveal.');
+      this.#emitChange(false);
+      return;
+    }
+    this.#pushHistory();
+    const { row, col } = target;
+    const digit = this.#solution[row][col];
+    this.#playerGrid[row][col] = digit;
+    this.#notes[row][col].clear();
+    this.#clearDigitFromPeerNotes(row, col, digit);
+    this.#givenMask[row][col] = true;
+    this.#hintsUsed++;
+    this.#selected = { row, col };
+    this.#announce(`Revealed ${digit} at row ${row + 1}, column ${col + 1}.`);
+
+    const conflicts = SudokuEngine.computeConflicts(this.#playerGrid);
+    this.#checkForSolve(conflicts);
+    this.#emitChange();
+  }
+
+  newGame(difficulty = this.#difficulty) {
+    const { puzzle, solution } = SudokuEngine.generatePuzzle(difficulty);
+    this.#difficulty = difficulty;
+    this.#puzzle = puzzle;
+    this.#solution = solution;
+    this.#playerGrid = cloneGrid(puzzle);
+    this.#givenMask = puzzle.map((row) => row.map((value) => value !== 0));
+    this.#notes = Array.from({ length: GRID_SIZE }, () =>
+      Array.from({ length: GRID_SIZE }, () => new Set()),
+    );
+    this.#selected = null;
+    this.#mistakes = 0;
+    this.#hintsUsed = 0;
+    this.#history = [];
+    this.#solved = false;
+    this.#elapsedBeforePause = 0;
+    this.#timerStartedAtMs = null;
+    this.#announce(`New ${difficulty} puzzle started.`);
+    this.resumeTimer();
+    this.#emitChange();
+  }
+
+  restartPuzzle() {
+    this.#playerGrid = cloneGrid(this.#puzzle);
+    this.#givenMask = this.#puzzle.map((row) => row.map((value) => value !== 0));
+    this.#notes = Array.from({ length: GRID_SIZE }, () =>
+      Array.from({ length: GRID_SIZE }, () => new Set()),
+    );
+    this.#mistakes = 0;
+    this.#hintsUsed = 0;
+    this.#history = [];
+    this.#solved = false;
+    this.#elapsedBeforePause = 0;
+    this.#timerStartedAtMs = null;
+    this.#announce('Puzzle restarted.');
+    this.resumeTimer();
+    this.#emitChange();
+  }
+
+  saveNow() {
+    this.#persist();
+  }
+
+  dispose() {
+    if (this.#timerHandle !== null) clearInterval(this.#timerHandle);
+    this.#timerHandle = null;
+  }
+
+  #isBoardComplete() {
+    return this.#playerGrid.every((row) => row.every((value) => value !== 0));
+  }
+
+  #checkForSolve(conflicts) {
+    if (this.#isBoardComplete() && !SudokuEngine.hasAnyConflict(conflicts)) {
+      this.#solved = true;
+      this.pauseTimer();
+      const plural = this.#mistakes === 1 ? '' : 's';
+      this.#announce(`Solved in ${formatTime(this.elapsedSeconds)} with ${this.#mistakes} mistake${plural}.`);
+    }
+  }
+
+  #pickHintTarget() {
+    const empties = SudokuEngine.allPositions().filter(({ row, col }) => this.#playerGrid[row][col] === 0);
+    if (empties.length > 0) return shuffle(empties)[0];
+
+    const wrong = SudokuEngine.allPositions().filter(
+      ({ row, col }) => !this.#givenMask[row][col] && this.#playerGrid[row][col] !== this.#solution[row][col],
+    );
+    if (wrong.length > 0) return shuffle(wrong)[0];
+
+    return null;
+  }
+
+  #clearDigitFromPeerNotes(row, col, digit) {
+    for (const peer of SudokuEngine.peersOf(row, col)) {
+      this.#notes[peer.row][peer.col].delete(digit);
+    }
+  }
+
+  #pushHistory() {
+    this.#history.push({
+      playerGrid: cloneGrid(this.#playerGrid),
+      notes: this.#notes.map((row) => row.map((set) => new Set(set))),
+      givenMask: this.#givenMask.map((row) => row.slice()),
+      mistakes: this.#mistakes,
+    });
+    if (this.#history.length > GameController.MAX_UNDO_STEPS) this.#history.shift();
+  }
+
+  #announce(message) {
+    this.dispatchEvent(new CustomEvent('announce', { detail: message }));
+  }
+
+  #emitChange(persist = true) {
+    if (persist) this.#persist();
+    this.dispatchEvent(new Event('change'));
+  }
+
+  #persist() {
+    if (typeof localStorage === 'undefined') return;
+    const state = {
+      version: STORAGE_VERSION,
+      difficulty: this.#difficulty,
+      puzzle: this.#puzzle,
+      solution: this.#solution,
+      playerGrid: this.#playerGrid,
+      givenMask: this.#givenMask,
+      notes: this.#notes.map((row) => row.map((set) => Array.from(set).sort((a, b) => a - b))),
+      mistakes: this.#mistakes,
+      hintsUsed: this.#hintsUsed,
+      elapsedSeconds: this.elapsedSeconds,
+      notesMode: this.#notesMode,
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch {
+      // Storage may be full, disabled, or unavailable (private browsing).
+      // The game keeps working in memory; persistence is a nice-to-have.
+    }
+  }
+}
+
+// ============================================================================
+// 6. SudokuView — DOM rendering (reads the controller, never mutates it
+//    directly)
+// ============================================================================
+
+const STYLE_ELEMENT_ID = 'msl-styles';
+
+class SudokuView {
+  #controller;
+  #refs;
+
+  constructor(root, controller) {
+    this.#controller = controller;
+    this.#refs = this.#buildLayout(root);
+    this.#attachEvents();
+    this.render(controller.snapshot);
+  }
+
+  render(snapshot) {
+    this.#refs.timerNode.textContent = formatTime(snapshot.elapsedSeconds);
+    this.#refs.mistakesNode.textContent = String(snapshot.mistakes);
+    this.#refs.hintsNode.textContent = String(snapshot.hintsRemaining);
+
+    const selectedValue =
+      snapshot.selected !== null ? snapshot.grid[snapshot.selected.row][snapshot.selected.col].value : 0;
+
+    for (let row = 0; row < GRID_SIZE; row++) {
+      for (let col = 0; col < GRID_SIZE; col++) {
+        const cell = snapshot.grid[row][col];
+        const button = this.#refs.cellButtons[row][col];
+        const isSelected = snapshot.selected?.row === row && snapshot.selected?.col === col;
+        const isPeer =
+          !isSelected &&
+          snapshot.selected !== null &&
+          (snapshot.selected.row === row ||
+            snapshot.selected.col === col ||
+            (Math.floor(snapshot.selected.row / BOX_HEIGHT) === Math.floor(row / BOX_HEIGHT) &&
+              Math.floor(snapshot.selected.col / BOX_WIDTH) === Math.floor(col / BOX_WIDTH)));
+        const isSameValue = selectedValue !== 0 && cell.value === selectedValue && !isSelected;
+
+        button.classList.toggle('msl-cell--given', cell.isGiven);
+        button.classList.toggle('msl-cell--selected', Boolean(isSelected));
+        button.classList.toggle('msl-cell--peer', isPeer);
+        button.classList.toggle('msl-cell--same-value', isSameValue);
+        button.classList.toggle('msl-cell--conflict', cell.hasConflict);
+        button.setAttribute('aria-selected', String(Boolean(isSelected)));
+        button.setAttribute('aria-readonly', String(cell.isGiven));
+
+        const valueNode = button.querySelector('.msl-cell-value');
+        const notesNode = button.querySelector('.msl-cell-notes');
+        if (valueNode) valueNode.textContent = cell.value === 0 ? '' : String(cell.value);
+        if (notesNode) {
+          const noteSpans = notesNode.querySelectorAll('span');
+          noteSpans.forEach((span, index) => {
+            const digit = index + 1;
+            span.textContent = cell.value === 0 && cell.notes.includes(digit) ? String(digit) : '';
+          });
+        }
+
+        const state = cell.isGiven ? 'given' : cell.value === 0 ? 'empty' : String(cell.value);
+        const conflictNote = cell.hasConflict ? ', conflicting' : '';
+        button.setAttribute('aria-label', `Row ${row + 1}, column ${col + 1}, ${state}${conflictNote}`);
+      }
+    }
+
+    for (const difficulty of DIFFICULTIES) {
+      const button = this.#refs.difficultyButtons[difficulty];
+      button.setAttribute('aria-pressed', String(difficulty === snapshot.difficulty));
+    }
+
+    this.#refs.notesToggleButton.textContent = snapshot.notesMode ? 'Notes: on' : 'Notes: off';
+    this.#refs.notesToggleButton.setAttribute('aria-pressed', String(snapshot.notesMode));
+    this.#refs.hintButton.textContent = `Hint (${snapshot.hintsRemaining} left)`;
+    this.#refs.hintButton.disabled = snapshot.hintsRemaining <= 0 || snapshot.isSolved;
+    this.#refs.undoButton.disabled = !snapshot.canUndo || snapshot.isSolved;
+
+    this.#refs.gridElement.classList.toggle('msl-grid--solved', snapshot.isSolved);
+    this.#refs.winPanel.hidden = !snapshot.isSolved;
+    if (snapshot.isSolved) {
+      const plural = snapshot.mistakes === 1 ? '' : 's';
+      const hintPlural = snapshot.hintsUsed === 1 ? '' : 's';
+      this.#refs.winText.textContent =
+        `Solved in ${formatTime(snapshot.elapsedSeconds)} with ${snapshot.mistakes} mistake${plural}` +
+        ` and ${snapshot.hintsUsed} hint${hintPlural}.`;
+    }
+  }
+
+  #buildLayout(root) {
+    const app = document.createElement('div');
+    app.className = 'msl-app';
+
+    // -- Header -------------------------------------------------------
+    const header = document.createElement('header');
+    header.className = 'msl-header';
+
+    const heading = document.createElement('div');
+    const title = document.createElement('h1');
+    title.className = 'msl-title';
+    title.textContent = 'Mini Logic';
+    const subtitle = document.createElement('p');
+    subtitle.className = 'msl-subtitle';
+    subtitle.textContent =
+      'A six-by-six number puzzle. Fill the grid so every row, column, and box holds 1 through 6 exactly once.';
+    heading.append(title, subtitle);
+
+    const status = document.createElement('div');
+    status.className = 'msl-status';
+    const timerWrap = SudokuView.#statusField('Time');
+    const mistakesWrap = SudokuView.#statusField('Mistakes');
+    const hintsWrap = SudokuView.#statusField('Hints left');
+    status.append(timerWrap.wrapper, mistakesWrap.wrapper, hintsWrap.wrapper);
+
+    header.append(heading, status);
+
+    // -- Grid -----------------------------------------------------------
+    const main = document.createElement('div');
+    main.className = 'msl-main';
+
+    const gridElement = document.createElement('div');
+    gridElement.className = 'msl-grid';
+    gridElement.setAttribute('role', 'grid');
+    gridElement.setAttribute('aria-label', 'Mini Sudoku puzzle grid, 6 rows by 6 columns');
+
+    const cellButtons = [];
+    for (let row = 0; row < GRID_SIZE; row++) {
+      const rowButtons = [];
+      for (let col = 0; col < GRID_SIZE; col++) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'msl-cell';
+        if ((col + 1) % BOX_WIDTH === 0 && col !== GRID_SIZE - 1) button.classList.add('msl-cell--box-right');
+        if ((row + 1) % BOX_HEIGHT === 0 && row !== GRID_SIZE - 1) button.classList.add('msl-cell--box-bottom');
+        button.setAttribute('role', 'gridcell');
+        button.setAttribute('aria-rowindex', String(row + 1));
+        button.setAttribute('aria-colindex', String(col + 1));
+
+        const valueSpan = document.createElement('span');
+        valueSpan.className = 'msl-cell-value';
+        const notesGrid = document.createElement('span');
+        notesGrid.className = 'msl-cell-notes';
+        for (let i = 0; i < GRID_SIZE; i++) notesGrid.appendChild(document.createElement('span'));
+
+        button.append(valueSpan, notesGrid);
+        button.addEventListener('click', () => {
+          this.#controller.selectCell(row, col);
+          button.focus();
+        });
+        gridElement.appendChild(button);
+        rowButtons.push(button);
+      }
+      cellButtons.push(rowButtons);
+    }
+    gridElement.addEventListener('keydown', (event) => this.#handleGridKeydown(event));
+
+    // -- Side panel -------------------------------------------------------
+    const panel = document.createElement('div');
+    panel.className = 'msl-panel';
+
+    const difficultyLabel = document.createElement('span');
+    difficultyLabel.className = 'msl-field-label';
+    difficultyLabel.textContent = 'Difficulty';
+    const difficultyRow = document.createElement('div');
+    difficultyRow.className = 'msl-difficulty';
+    const difficultyButtons = {};
+    const difficultyLabels = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+    for (const difficulty of DIFFICULTIES) {
+      const button = SudokuView.#makeButton(difficultyLabels[difficulty]);
+      button.addEventListener('click', () => this.#controller.newGame(difficulty));
+      difficultyButtons[difficulty] = button;
+      difficultyRow.appendChild(button);
+    }
+
+    const actionsRow = document.createElement('div');
+    actionsRow.className = 'msl-actions';
+    const newGameButton = SudokuView.#makeButton('New puzzle');
+    newGameButton.addEventListener('click', () => this.#controller.newGame());
+    const restartButton = SudokuView.#makeButton('Restart');
+    restartButton.addEventListener('click', () => this.#controller.restartPuzzle());
+    const undoButton = SudokuView.#makeButton('Undo');
+    undoButton.addEventListener('click', () => this.#controller.undo());
+    const notesToggleButton = SudokuView.#makeButton('Notes: off');
+    notesToggleButton.addEventListener('click', () => this.#controller.toggleNotesMode());
+    const hintButton = SudokuView.#makeButton('Hint');
+    hintButton.addEventListener('click', () => this.#controller.requestHint());
+    actionsRow.append(newGameButton, restartButton, undoButton, notesToggleButton, hintButton);
+
+    const keypadLabel = document.createElement('span');
+    keypadLabel.className = 'msl-field-label';
+    keypadLabel.textContent = 'Enter a number';
+    const keypadRow = document.createElement('div');
+    keypadRow.className = 'msl-keypad';
+    const keypadButtons = {};
+    for (const digit of DIGITS) {
+      const button = SudokuView.#makeButton(String(digit), 'msl-key');
+      button.addEventListener('click', () => this.#controller.inputDigit(digit));
+      keypadButtons[digit] = button;
+      keypadRow.appendChild(button);
+    }
+    const eraseButton = SudokuView.#makeButton('Erase', 'msl-key--erase');
+    eraseButton.addEventListener('click', () => this.#controller.eraseSelected());
+    keypadRow.appendChild(eraseButton);
+
+    const winPanel = document.createElement('div');
+    winPanel.className = 'msl-win';
+    winPanel.hidden = true;
+    winPanel.setAttribute('role', 'status');
+    const winText = document.createElement('p');
+    winText.style.margin = '0';
+    winPanel.appendChild(winText);
+
+    const help = document.createElement('p');
+    help.className = 'msl-help';
+    help.textContent =
+      'Select a cell, then choose a number. Every puzzle has exactly one solution, so conflicts always mean a ' +
+      'cell needs to change, not a guess gone unlucky.';
+
+    panel.append(difficultyLabel, difficultyRow, actionsRow, keypadLabel, keypadRow, winPanel, help);
+
+    main.append(gridElement, panel);
+
+    const announceNode = document.createElement('p');
+    announceNode.className = 'msl-visually-hidden';
+    announceNode.setAttribute('role', 'status');
+    announceNode.setAttribute('aria-live', 'polite');
+
+    app.append(header, main, announceNode);
+    root.appendChild(app);
+
+    return {
+      gridElement,
+      cellButtons,
+      timerNode: timerWrap.value,
+      mistakesNode: mistakesWrap.value,
+      hintsNode: hintsWrap.value,
+      announceNode,
+      notesToggleButton,
+      hintButton,
+      undoButton,
+      restartButton,
+      newGameButton,
+      difficultyButtons,
+      keypadButtons,
+      eraseButton,
+      winPanel,
+      winText,
+    };
+  }
+
+  static #statusField(label) {
+    const wrapper = document.createElement('span');
+    const value = document.createElement('strong');
+    value.textContent = '—';
+    const caption = document.createElement('span');
+    caption.textContent = label;
+    caption.style.fontSize = '0.72rem';
+    wrapper.append(value, caption);
+    return { wrapper, value };
+  }
+
+  static #makeButton(text, extraClass) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = extraClass ? `msl-btn ${extraClass}` : 'msl-btn';
+    button.textContent = text;
+    return button;
+  }
+
+  #handleGridKeydown(event) {
+    const arrowDeltas = {
+      ArrowUp: [-1, 0],
+      ArrowDown: [1, 0],
+      ArrowLeft: [0, -1],
+      ArrowRight: [0, 1],
+    };
+    if (event.key in arrowDeltas) {
+      const [dRow, dCol] = arrowDeltas[event.key];
+      this.#controller.moveSelection(dRow, dCol);
+      const snapshot = this.#controller.snapshot;
+      if (snapshot.selected) this.#refs.cellButtons[snapshot.selected.row][snapshot.selected.col].focus();
+      event.preventDefault();
+      return;
+    }
+    if (event.key === 'Backspace' || event.key === 'Delete' || event.key === '0') {
+      this.#controller.eraseSelected();
+      event.preventDefault();
+      return;
+    }
+    if (event.key === 'n' || event.key === 'N') {
+      this.#controller.toggleNotesMode();
+      event.preventDefault();
+      return;
+    }
+    if (event.key === 'h' || event.key === 'H') {
+      this.#controller.requestHint();
+      event.preventDefault();
+      return;
+    }
+    if (event.key === 'u' || event.key === 'U') {
+      this.#controller.undo();
+      event.preventDefault();
+      return;
+    }
+    if (/^[1-6]$/.test(event.key)) {
+      this.#controller.inputDigit(Number(event.key));
+      event.preventDefault();
+    }
+  }
+
+  #attachEvents() {
+    this.#controller.addEventListener('change', () => this.render(this.#controller.snapshot));
+    this.#controller.addEventListener('tick', (event) => {
+      this.#refs.timerNode.textContent = formatTime(event.detail);
+    });
+    this.#controller.addEventListener('announce', (event) => {
+      this.#refs.announceNode.textContent = event.detail;
+    });
+  }
+}
+
+// ============================================================================
+// 7. Bootstrap
+// ============================================================================
+
+function bootstrap() {
+  const root = document.getElementById('mini-logic-root') ?? (() => {
+    const div = document.createElement('div');
+    div.id = 'mini-logic-root';
+    document.body.appendChild(div);
+    return div;
+  })();
+
+  const controller = GameController.restoreOrCreate();
+  new SudokuView(root, controller);
+  controller.resumeTimer();
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) controller.pauseTimer();
+    else controller.resumeTimer();
+  });
+  window.addEventListener('pagehide', () => controller.saveNow());
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootstrap, { once: true });
+} else {
+  bootstrap();
+}
+</script>
+</body>
+</html>
